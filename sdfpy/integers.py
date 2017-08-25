@@ -3,20 +3,6 @@ from fractions import gcd
 def lcm(a, b):
     return a * b // gcd(a, b)
 
-def xgcd_old(a,b):
-    a1 = 1; b1 = 0; a2 = 0; b2 = 1
-    while (1):
-        quot = -(a // b)
-        a = a % b
-        a1 = a1 + quot*a2; b1 = b1 + quot*b2
-        if(a == 0):
-            return [b, a2, b2]
-        quot = -(b // a)
-        b = b % a;
-        a2 = a2 + quot*a1; b2 = b2 + quot*b1
-        if(b == 0):
-            return [a, a1, b1]
-
 def modinv(a, m):
     g, x, y = xgcd(a, m)
     if g != 1:
@@ -35,3 +21,45 @@ def xgcd(a, b):
         b,a, x,y, u,v = a,r, u,v, m,n
     _gcd = b
     return _gcd, x, y
+
+def crt2( n1, a1, n2, a2 ):
+    """ Computes the solution to the 2 simultaneous congruence relations:
+
+        x = a1 (mod n1)
+        x = a2 (mod n2)
+    """
+    g = gcd( n1, n2 )
+    delta = a2 - a1
+    if delta % g != 0:
+        raise ArithmeticError("No solution")
+
+    delta = delta // g
+    inv = mul_inv( n1 // g, n2 // g )
+    modulus = (n1 // g) * n2
+    return modulus, (a1 + n1 * inv * delta) % modulus
+
+def chinese_remainder(n, a):
+    """ Computes the solution of a system of congruence relations, given by n and a
+
+        n:  list of moduli
+        a:  list of remainders
+
+    """
+    tups = iter(zip(n, a))
+    n1, a1 = next(tups)
+    for n2, a2 in tups:
+        n1, a1 = crt2( n1, a1, n2, a2 )
+
+    return n1, a1
+ 
+def mul_inv(a, b):
+    b0 = b
+    x0, x1 = 0, 1
+    if b == 1: return 1
+    while a > 1:
+        q = a // b
+        a, b = b, a%b
+        x0, x1 = x1 - q * x0, x0
+    if x1 < 0: x1 += b0
+    return x1
+
