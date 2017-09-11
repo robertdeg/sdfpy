@@ -6,8 +6,8 @@ import sys
 import re
 import pdb
 from fractions import Fraction, gcd
-from syncdataflow.integers import lcm
-from syncdataflow.graphs import dfs_edges
+from sdfpy.integers import lcm
+from sdfpy.graphs import dfs_edges
 import xml.etree.ElementTree as etree
 
 class SDFGraph( nx.MultiDiGraph ):

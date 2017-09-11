@@ -134,4 +134,121 @@ def circuit_basis( g ):
 
                 h.remove_node( v )
 
+def longest_distances( g, root, weight_attr = "weight" ):
+    # maintain distances in dict
+    distances = dict()
+    distances[ root ] = 0
+
+    # maintain a post order so that we can finish nodes
+    # in topological order after each DFS
+    post_order = list()
+
+    queue = [ root ]
+    while queue:
+        # run DFS from nodes in queue
+        visited = dict()
+        while queue:
+            # peek queue
+            v = queue[ -1 ]
+            distance_from_v = distances[ v ]
+            try:
+                # visit next child
+                children = visited[ v ]
+                try:
+                    _, w, data = next( children )
+                    weight = data.get( weight_attr )
+                    distance_to_w = distances.get( w )
+                    distance_via_v = distance_from_v + weight
+
+                    admissible = (distance_to_w is None) or (distance_via_v > distance_to_w)
+                    if w not in visited and admissible:
+                        distances[ w ] = distance_via_v
+                        queue.append( w )
+                except StopIteration:
+                    # post visit v
+                    post_order.append( v )
+                    queue.pop()
+            except KeyError:
+                # not visited yet, pre-visit v
+                visited[ v ] = g.out_edges_iter( v, data = True )
+
+        # go over nodes in reverse post order (i.e. topological order)
+        visited = dict()
+        while post_order:
+            v = post_order.pop()
+            visited[ v ] = -1
+            distance_from_v = distances[ v ]
+
+            for _, w, data in g.out_edges_iter( v, data = True ):
+                weight = data.get( weight_attr )
+                distance_to_w = distances[ w ]
+                distance_via_v = distance_from_v + weight
+
+                if distance_via_v > distance_to_w:
+                    distances[ w ] = distance_via_v
+                    pos_in_queue = visited.get( w )
+                    if pos_in_queue is not None and pos_in_queue < 0:
+                        visited[ w ] = len( queue )
+                        queue.append( w )
+
+    return distances
+
+def shortest_distances( g, root, weight_attr = "weight" ):
+    # maintain distances in dict
+    distances = dict()
+    distances[ root ] = 0
+
+    # maintain a post order so that we can finish nodes
+    # in topological order after each DFS
+    post_order = list()
+
+    queue = [ root ]
+    while queue:
+        # run DFS from nodes in queue
+        visited = dict()
+        while queue:
+            # peek queue
+            v = queue[ -1 ]
+            distance_from_v = distances[ v ]
+            try:
+                # visit next child
+                children = visited[ v ]
+                try:
+                    _, w, data = next( children )
+                    weight = data.get( weight_attr )
+                    distance_to_w = distances.get( w )
+                    distance_via_v = distance_from_v + weight
+
+                    admissible = (distance_to_w is None) or (distance_via_v < distance_to_w)
+                    if w not in visited and admissible:
+                        distances[ w ] = distance_via_v
+                        queue.append( w )
+                except StopIteration:
+                    # post visit v
+                    post_order.append( v )
+                    queue.pop()
+            except KeyError:
+                # not visited yet, pre-visit v
+                visited[ v ] = g.out_edges_iter( v, data = True )
+
+        # go over nodes in reverse post order (i.e. topological order)
+        visited = dict()
+        while post_order:
+            v = post_order.pop()
+            visited[ v ] = -1
+            distance_from_v = distances[ v ]
+
+            for _, w, data in g.out_edges_iter( v, data = True ):
+                weight = data.get( weight_attr )
+                distance_to_w = distances[ w ]
+                distance_via_v = distance_from_v + weight
+
+                if distance_via_v < distance_to_w:
+                    distances[ w ] = distance_via_v
+                    pos_in_queue = visited.get( w )
+                    if pos_in_queue is not None and pos_in_queue < 0:
+                        visited[ w ] = len( queue )
+                        queue.append( w )
+
+    return distances
 
