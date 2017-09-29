@@ -1,6 +1,27 @@
 import networkx as nx
 from random import sample, seed
 from math import ceil
+from collections import deque
+
+class InfeasibleCycle(Exception):
+    def __init__(self, cycle):
+        self.cycle = cycle
+
+    @property
+    def cycle(self):
+        return self.__cycle
+
+    @cycle.setter
+    def cycle(self, value):
+        self.__cycle = value
+
+class PositiveCycle(InfeasibleCycle):
+    def __init__(self, cycle):
+        super().__init__(cycle)
+
+class NegativeCycle(InfeasibleCycle):
+    def __init__(self, cycle):
+        super().__init__(cycle)
 
 def cycle_induced_subgraph(g):
     ''' Computes the subgraph that is maximally edge-induced by its cycles
@@ -139,6 +160,10 @@ def longest_distances( g, root, weight_attr = "weight" ):
     distances = dict()
     distances[ root ] = 0
 
+    # maintain shortest paths tree structure
+    parents = dict()
+    parents[ root ] = None
+
     # maintain a post order so that we can finish nodes
     # in topological order after each DFS
     post_order = list()
@@ -155,7 +180,7 @@ def longest_distances( g, root, weight_attr = "weight" ):
                 # visit next child
                 children = visited[ v ]
                 try:
-                    _, w, data = next( children )
+                    _, w, key, data = next( children )
                     weight = data.get( weight_attr )
                     distance_to_w = distances.get( w )
                     distance_via_v = distance_from_v + weight
@@ -163,14 +188,33 @@ def longest_distances( g, root, weight_attr = "weight" ):
                     admissible = (distance_to_w is None) or (distance_via_v > distance_to_w)
                     if w not in visited and admissible:
                         distances[ w ] = distance_via_v
+                        parents[ w ] = v, w, key
                         queue.append( w )
+                    elif admissible:
+                        # w was visited before. if w is an ancestor of v,
+                        # then we have found a negative cycle
+                        children_w = visited[ w ]
+                        if children_w is not None:
+                            # w is an ancestor of v -> negative cycle found
+                            # trace edges back to w
+                            path = deque([ (v, w, key) ])
+                            p = v
+                            while p != w:
+                                k, _, key = parents[ p ]
+                                path.appendleft( (k, p, key) )
+                                p = k
+
+                            raise PositiveCycle( list( path ))
                 except StopIteration:
                     # post visit v
                     post_order.append( v )
+
+                    # indicate that v is post-visited
+                    visited[ v ] = None
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
-                visited[ v ] = g.out_edges_iter( v, data = True )
+                visited[ v ] = g.out_edges_iter( v, keys = True, data = True )
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()
@@ -179,24 +223,30 @@ def longest_distances( g, root, weight_attr = "weight" ):
             visited[ v ] = -1
             distance_from_v = distances[ v ]
 
-            for _, w, data in g.out_edges_iter( v, data = True ):
+            for _, w, key, data in g.out_edges_iter( v, keys = True, data = True ):
                 weight = data.get( weight_attr )
                 distance_to_w = distances[ w ]
                 distance_via_v = distance_from_v + weight
 
                 if distance_via_v > distance_to_w:
                     distances[ w ] = distance_via_v
+                    parents[ w ] = v, w, key
+
                     pos_in_queue = visited.get( w )
                     if pos_in_queue is not None and pos_in_queue < 0:
                         visited[ w ] = len( queue )
                         queue.append( w )
 
-    return distances
+    return parents, distances
 
 def shortest_distances( g, root, weight_attr = "weight" ):
     # maintain distances in dict
     distances = dict()
     distances[ root ] = 0
+
+    # maintain shortest paths tree structure
+    parents = dict()
+    parents[ root ] = None
 
     # maintain a post order so that we can finish nodes
     # in topological order after each DFS
@@ -214,7 +264,7 @@ def shortest_distances( g, root, weight_attr = "weight" ):
                 # visit next child
                 children = visited[ v ]
                 try:
-                    _, w, data = next( children )
+                    _, w, key, data = next( children )
                     weight = data.get( weight_attr )
                     distance_to_w = distances.get( w )
                     distance_via_v = distance_from_v + weight
@@ -222,14 +272,33 @@ def shortest_distances( g, root, weight_attr = "weight" ):
                     admissible = (distance_to_w is None) or (distance_via_v < distance_to_w)
                     if w not in visited and admissible:
                         distances[ w ] = distance_via_v
+                        parents[ w ] = v, w, key
                         queue.append( w )
+                    elif admissible:
+                        # w was visited before. if w is an ancestor of v,
+                        # then we have found a negative cycle
+                        children_w = visited[ w ]
+                        if children_w is not None:
+                            # w is an ancestor of v -> negative cycle found
+                            # trace edges back to w
+                            path = deque([ (v, w, key) ])
+                            p = v
+                            while p != w:
+                                k, _, key = parents[ p ]
+                                path.appendleft( (k, p, key) )
+                                p = k
+
+                            raise NegativeCycle( list( path ))
                 except StopIteration:
                     # post visit v
                     post_order.append( v )
+
+                    # indicate that v is post-visited
+                    visited[ v ] = None
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
-                visited[ v ] = g.out_edges_iter( v, data = True )
+                visited[ v ] = g.out_edges_iter( v, keys = True, data = True )
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()
@@ -238,17 +307,19 @@ def shortest_distances( g, root, weight_attr = "weight" ):
             visited[ v ] = -1
             distance_from_v = distances[ v ]
 
-            for _, w, data in g.out_edges_iter( v, data = True ):
+            for _, w, key, data in g.out_edges_iter( v, keys = True, data = True ):
                 weight = data.get( weight_attr )
                 distance_to_w = distances[ w ]
                 distance_via_v = distance_from_v + weight
 
                 if distance_via_v < distance_to_w:
                     distances[ w ] = distance_via_v
+                    parents[ w ] = v, w, key
+
                     pos_in_queue = visited.get( w )
                     if pos_in_queue is not None and pos_in_queue < 0:
                         visited[ w ] = len( queue )
                         queue.append( w )
 
-    return distances
+    return parents, distances
 
