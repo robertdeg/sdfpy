@@ -1,0 +1,6 @@
+# VIM swap files
+*.swp
+
+# Python precompiled stuff
+__pycache__
+
