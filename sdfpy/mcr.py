@@ -35,7 +35,7 @@ def max_cycle_ratio( g, estimate = None ):
             maxratio = scc_mcr
             arg_cycle = cycle
 
-    forest = list()
+    forest = Forest()
     for scc in nx.strongly_connected_component_subgraphs( g, False ):
         if scc.number_of_edges() == 0:
             continue
@@ -47,7 +47,11 @@ def max_cycle_ratio( g, estimate = None ):
             scc_data['w'] = data.get( 'weight', 0 ) - data.get( 'tokens', 0 ) * maxratio
 
         root = w
-        lpp_tree, _ = graphs.longest_distances( scc, root, 'w' )
+        parents, _ = longest_distances( scc, root, 'w' )
+        for child in parents:
+            in_edge = parents.get( child )
+            if in_edge is not None:
+                forest.add_edge( *in_edge )
 
     return maxratio, arg_cycle, forest
 

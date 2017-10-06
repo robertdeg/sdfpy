@@ -10,6 +10,27 @@ def canonicalform( ls ):
 
     return ls
 
+class TestMaxCycleRatioMultiComponent(unittest.TestCase):
+    def test_two_components(self):
+        g = nx.MultiDiGraph()
+
+        # component 1 with cycle ratio 3
+        g.add_edge( 1, 2, weight = 5, tokens = 1 )
+        g.add_edge( 2, 1, weight = 1, tokens = 1 )
+
+        # component 2 with cycle ratio 9/2
+        g.add_edge( 3, 4, weight = 2, tokens = 2 )
+        g.add_edge( 4, 5, weight = 3, tokens = 0 )
+        g.add_edge( 5, 3, weight = 4, tokens = 0 )
+
+        g.add_edge( 2, 3, weight = 100, tokens = 0 )
+
+        try:
+            ratio, cycle, forest = mcr.max_cycle_ratio( g )
+            self.assertEqual( ratio, Fraction( 9, 2 ))
+            self.assertListEqual( canonicalform(cycle), [(3, 4, 0), (4, 5, 0), (5, 3, 0)] )
+        except mcr.InfeasibleException as c:
+            self.fail()
 
 class TestMaxCycleRatioSingleComponent(unittest.TestCase):
     def test_deadlocked_self_loop(self):
@@ -62,6 +83,31 @@ class TestMaxCycleRatioSingleComponent(unittest.TestCase):
             self.assertListEqual( canonicalform(c.cycle), [(2, 3, 1), (3, 2, 1)] )
         else:
             self.fail( "Deadlocked self-loop not detected" )
+
+    def test_critical_selfloop(self):
+        g = nx.MultiDiGraph()
+        g.add_edge( 1, 2, weight = 5, tokens = 3 )
+        g.add_edge( 2, 1, weight = 5, tokens = 1 )
+
+        g.add_edge( 1, 1, weight = 8, tokens = 3 )
+        g.add_edge( 1, 1, weight = 3, tokens = 1 )
+        g.add_edge( 2, 2, weight = 5, tokens = 2 )
+        g.add_edge( 2, 2, weight = 2, tokens = 1 )
+
+        try:
+            cr = 3
+            cc = [(1, 1, 1)]
+            cycle_ratio_1, cycle_1 = mcr.compute_mcr_component( g, 1 )
+            self.assertEqual( cycle_ratio_1, cr )
+
+            cycle_ratio_2, cycle_2 = mcr.compute_mcr_component( g, 2 )
+            self.assertEqual( cycle_ratio_2, cr )
+
+            self.assertListEqual( canonicalform(cycle_1), cc )
+            self.assertListEqual( canonicalform(cycle_2), cc )
+
+        except mcr.InfeasibleException as c:
+            self.fail( "Incorrectly concluded deadlock" )
 
     def test_simple(self):
         g = nx.MultiDiGraph()
