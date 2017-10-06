@@ -132,4 +132,14 @@ class Forest( object ):
                 for _, b, *_ in n.pre_order_edges():
                     yield b
 
+    def pre_order_edges( self, root = None ):
+        if root is not None:
+            n = self.__nodes[ root ]
+            yield from n.pre_order_edges()
+        else:
+            for r in self.__roots:
+                n = self.__roots[ r ]
+                yield from n.pre_order_edges()
+
+
 
