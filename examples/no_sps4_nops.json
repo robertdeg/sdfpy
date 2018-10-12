@@ -1,0 +1,15 @@
+{
+  "actors": [
+    { "name": "a", "wcet": 1 },
+    { "name": "b", "wcet": 1 },
+    { "name": "c", "wcet": 1 },
+    { "name": "d", "wcet": 1 }],
+  "channels": [
+    { "from": "a", "to": "b", "production": [2, 4, 0], "consumption": 3, "tokens": 1 },
+    { "from": "b", "to": "c", "production": 3, "consumption": [2, 4, 0], "tokens": 0 },
+    { "from": "c", "to": "d", "production": [2, 4, 0], "consumption": 3, "tokens": 4 },
+    { "from": "d", "to": "a", "production": 3, "consumption": [2, 4, 0], "tokens": 0 }],
+  "type": "csdf"
+}
+
+

@@ -78,6 +78,9 @@ def compute_mcr_component( g, root, estimate = None ):
     initial_graph = nx.MultiDiGraph()
     
     # construct graph with non-parametric path weights
+    for v in g:
+        initial_graph.add_node( v )
+
     for v, w, key, data in nx.MultiDiGraph(g).edges_iter(keys = True, data = True):
         tokens = data.get('tokens', 0)
         weight = data.get('weight', 0)
@@ -93,10 +96,11 @@ def compute_mcr_component( g, root, estimate = None ):
                 tree.add_edge( *in_edge )
 
         distances[root] = pdistance(0, 0)
-        for v, w, key in tree.pre_order_edges( root ):
-            dv = distances[ v ]
-            data = initial_graph.get_edge_data( v, w, key )
-            distances[ w ] = dv + data.get('dist')
+        if root in tree:
+            for v, w, key in tree.pre_order_edges( root ):
+                dv = distances[ v ]
+                data = initial_graph.get_edge_data( v, w, key )
+                distances[ w ] = dv + data.get('dist')
 
     except PositiveCycle as ex:
         raise InfeasibleException( ex.cycle )
