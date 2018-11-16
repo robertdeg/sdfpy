@@ -30,15 +30,15 @@ def cycle_induced_subgraph(g):
     '''
 
     # gather all edges of SCCs
-    return nx.DiGraph( ( edge for scc in nx.strongly_connected_component_subgraphs( g ) for edge in scc.edges_iter() ))
+    return nx.DiGraph( ( edge for scc in nx.strongly_connected_component_subgraphs( g ) for edge in scc.edges() ))
 
 def dfs_edges( g, root = None ):
     if g.number_of_nodes() == 0: return
     visited = set()
     stack = list()
 
-    root = root or next(g.nodes_iter())
-    stack.append( (root, g.edges_iter( root )))
+    root = root or next(g.nodes())
+    stack.append( (root, g.edges( root )))
     while stack:
         (v, it) = stack[-1]
         visited.add( v )
@@ -46,7 +46,7 @@ def dfs_edges( g, root = None ):
             v, w = next(it)
             yield (v, w)
             if w not in visited:
-                stack.append( (w, g.edges_iter( w )))
+                stack.append( (w, g.edges( w )))
         except StopIteration:
             stack.pop()
 
@@ -64,7 +64,7 @@ def circuit_basis( g ):
         h.add_node( (v, ))
 
     # add edges from g to h
-    for u, v, in g.edges_iter():
+    for u, v, in g.edges():
         h.add_edge( (u, ), (v, ), edge = (u, v ) )
 
     # self-loops are fundamental circuits
@@ -80,20 +80,20 @@ def circuit_basis( g ):
     # find a cycle using depth-first search
     while h.number_of_edges() > 0:
         # choose a random starting point
-        root = next( h.nodes_iter())
+        root = next( h.nodes())
 
         # run DFS from root
         parent = dict()
         queue = list()
         visited = dict()
-        queue.append( (root, h.out_edges_iter( root, keys = True )))
+        queue.append( (root, h.out_edges( root, keys = True )))
         while queue:
             v, it = queue[-1]
             visited[v] = False
             try:
                 _, w, idx = next( it )
                 if w not in visited:
-                    queue.append( (w, h.out_edges_iter( w, keys = True )))
+                    queue.append( (w, h.out_edges( w, keys = True )))
                     parent[ w ] = v, idx
                 elif not visited[ w ]:
                     # back edge, cycle found
@@ -147,10 +147,10 @@ def circuit_basis( g ):
             h.add_node( ns)
 
             for v, _, _ in cycle:
-                for u, _, data in h.in_edges_iter( v, True ):
+                for u, _, data in h.in_edges( v, True ):
                     h.add_edge( u, ns, edge = data.get('edge'))
 
-                for _, w, data in h.out_edges_iter( v, True ):
+                for _, w, data in h.out_edges( v, True ):
                     h.add_edge( ns, w, edge = data.get('edge'))
 
                 h.remove_node( v )
@@ -214,7 +214,7 @@ def longest_distances( g, root, weight_attr = "weight" ):
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
-                visited[ v ] = g.out_edges_iter( v, keys = True, data = True )
+                visited[ v ] = g.out_edges( v, keys = True, data = True )
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()
@@ -223,7 +223,7 @@ def longest_distances( g, root, weight_attr = "weight" ):
             visited[ v ] = -1
             distance_from_v = distances[ v ]
 
-            for _, w, key, data in g.out_edges_iter( v, keys = True, data = True ):
+            for _, w, key, data in g.out_edges( v, keys = True, data = True ):
                 weight = data.get( weight_attr )
                 distance_to_w = distances[ w ]
                 distance_via_v = distance_from_v + weight
@@ -298,7 +298,7 @@ def shortest_distances( g, root, weight_attr = "weight" ):
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
-                visited[ v ] = g.out_edges_iter( v, keys = True, data = True )
+                visited[ v ] = g.out_edges( v, keys = True, data = True )
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()
@@ -307,7 +307,7 @@ def shortest_distances( g, root, weight_attr = "weight" ):
             visited[ v ] = -1
             distance_from_v = distances[ v ]
 
-            for _, w, key, data in g.out_edges_iter( v, keys = True, data = True ):
+            for _, w, key, data in g.out_edges( v, keys = True, data = True ):
                 weight = data.get( weight_attr )
                 distance_to_w = distances[ w ]
                 distance_via_v = distance_from_v + weight
