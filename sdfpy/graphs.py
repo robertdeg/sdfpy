@@ -40,11 +40,13 @@ def dfs_edges( g, root = None ):
     root = root or next(g.nodes())
     stack.append( (root, g.edges( root )))
     while stack:
-        (v, it) = stack[-1]
+        v, it = stack[-1]
         visited.add( v )
         try:
-            v, w = next(it)
-            yield (v, w)
+            edge = next(it)
+            yield edge
+
+            _, w, *_ = edge
             if w not in visited:
                 stack.append( (w, g.edges( w )))
         except StopIteration:

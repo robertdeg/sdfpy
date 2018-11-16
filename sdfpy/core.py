@@ -2,10 +2,12 @@ from math import ceil
 from functools import reduce
 import networkx as nx
 import json
+import yaml
 import sys
 import re
 import pdb
-from fractions import Fraction, gcd
+from fractions import Fraction
+from math import gcd
 from sdfpy.integers import lcm
 from sdfpy.graphs import dfs_edges
 import xml.etree.ElementTree as etree
@@ -74,7 +76,6 @@ class SDFGraph( nx.MultiDiGraph ):
             wcet = data.get('wcet', 0)
             actors.append( dict(name = str(v), wcet = wcet if len(wcet) > 1 else wcet[0] ))
 
-        print(actors)
         channels = list()
         for v, w, data in self.edges( data = True ):
             d = dict(to = str(w))
@@ -120,8 +121,8 @@ class SDFGraph( nx.MultiDiGraph ):
             super().add_node( v, wcet = wcet, phases = len( wcet ))
 
         for u, v, data in graph.edges( data = True ):
-            production = SDFGraph.__validate_vector( (u, v), data.pop('production', 1), 'production rate' )
-            consumption = SDFGraph.__validate_vector( (u, v), data.pop('consumption', 1), 'consumption rates' )
+            production = SDFGraph.__validate_vector( (u, v), data.get('production', 1), 'production rate' )
+            consumption = SDFGraph.__validate_vector( (u, v), data.get('consumption', 1), 'consumption rates' )
             g_uv = gcd( production.sum(), consumption.sum() )
 
             try:
@@ -199,7 +200,7 @@ class SDFGraph( nx.MultiDiGraph ):
     def add_edge(self, u, v, attr_dict = None, **attr):
         assert attr_dict is None, "FIXME: add_edge does not deal with attr_dict"
 
-        production = attr['production'] = SDFGraph.validate_vector( (u, v), attr.pop('production', 1), 'production rate' )
+        production = attr['production'] = SDFGraph.validate_vector( (u, v), attr.get('production', 1), 'production rate' )
         assert type(production) is cyclic
 
         # update phases
@@ -209,7 +210,7 @@ class SDFGraph( nx.MultiDiGraph ):
         except KeyError:
             super().add_node( u, wcet = cyclic( 0 ), phases = len( production ), period = 1 )
 
-        consumption = attr['consumption'] = SDFGraph.validate_vector( (u, v), attr.pop('consumption', 1), 'consumption rates' )
+        consumption = attr['consumption'] = SDFGraph.validate_vector( (u, v), attr.get('consumption', 1), 'consumption rates' )
         assert type(consumption) is cyclic
 
         # update phases
@@ -321,28 +322,30 @@ class SDFGraph( nx.MultiDiGraph ):
             # get rates of channel (v, w)
             data = self.get_edge_data( v, w, key )
             p_vw, c_vw = data.get('production'), data.get('consumption')
+            v_period = self.node[ v ]['period']
+            w_period = self.node[ w ]['period']
 
             # if there is an edge (w, v) in sdfg, check whether it's consistent with (v, w)
             if v != w and self.has_edge(w, v):
                 data_reverse = self.get_edge_data(w, v, 0)
                 p_wv, c_wv = data_reverse.get('production'), data_reverse.get('consumption')
-                if p_vw.sum() * p_wv.sum() != c_vw.sum() * c_wv.sum():
+                if p_vw.sum( 0, v_period ) * p_wv.sum( 0, w_period ) != c_vw.sum( 0, w_period ) * c_wv.sum( 0, v_period ):
                     raise Exception("Inconsistent cycle: [{},{},{}]".format( v, w, v ))
 
             # check consistency of (v, w) with rest of the self
             if (v in fractional_q) and (w in fractional_q):
-                if p_vw.sum() * fractional_q[v] != c_vw.sum() * fractional_q[w]:
+                if p_vw.sum( 0, v_period ) * fractional_q[v] != c_vw.sum( 0, w_period ) * fractional_q[w]:
                     raise Exception("Inconsistent edge: ({},{})".format( v, w ))
 
             elif (v in fractional_q):
-                fractional_q[w] = fractional_q[v] * Fraction(p_vw.sum(), c_vw.sum())
+                fractional_q[w] = fractional_q[v] * Fraction(p_vw.sum( 0, v_period ), c_vw.sum( 0, w_period ))
 
             elif (w in fractional_q):
-                fractional_q[v] = fractional_q[w] * Fraction(c_vw.sum(), p_vw.sum())
+                fractional_q[v] = fractional_q[w] * Fraction(c_vw.sum( 0, w_period ), p_vw.sum( 0, v_period ))
 
             else:
                 fractional_q[v] = 1
-                fractional_q[w] = Fraction(p_vw.sum(), c_vw.sum())
+                fractional_q[w] = Fraction(p_vw.sum( 0, v_period ), c_vw.sum( 0, w_period ))
             
         # compute the LCM of the denominators in the fractional repetition vector
         m = 1
@@ -355,7 +358,8 @@ class SDFGraph( nx.MultiDiGraph ):
         for k in fractional_q:
             f = fractional_q[k] 
             q[k] = int(f * m * self.phases(k))
-            tpi = lcm(tpi, node_lcm_rates[k] * f * m)
+            assert (node_lcm_rates[k] * f * m).denominator == 1
+            tpi = lcm( tpi, (node_lcm_rates[k] * f * m).numerator )
 
         s = {}
         for v, w, data in self.edges(data = True):
@@ -642,46 +646,94 @@ def write_sdf_xml( g, filename ):
     tree = etree.ElementTree( root )
     tree.write( filename,  )
     
+def load_sdf_yaml(filename):
+    with open(filename, 'r') as stream:
+        try:
+            contents = yaml.load( stream )
+            if 'graph' not in contents:
+                raise SDFParseError("Missing field: 'graph'")
+
+            graph = contents.get('graph')
+        except yaml.YAMLError as exc:
+            raise SDFParseError("YAML error", exc)
+
+        if 'actors' not in graph:
+            raise SDFParseError("Missing field: 'actors'")
+
+        if 'channels' not in graph:
+            raise SDFParseError("Missing field: 'channels'")
+
+        # Create empty directed graph
+        sdfg = nx.MultiDiGraph()
+
+        for actor in graph['actors']:
+            if 'name' not in actor:
+                raise Exception("Missing field in actor: 'name'")
+
+            name = actor['name']
+
+            if 'wcet' not in actor:
+                print("Warning: assuming constant wcet of 1 for actor '{}'".format(name), file=sys.stderr)
+                wcet = 1
+            else:
+                wcet = actor['wcet']
+                
+            sdfg.add_node(name, wcet = wcet)
+
+        for channel in graph['channels']:
+            if 'from' not in channel: raise Exception("Missing field in channel: 'from'")
+            if 'to' not in channel: raise Exception("Missing field in channel: 'to'")
+
+            (v, w) = (channel['from'], channel['to'])
+            if v not in sdfg: raise Exception("Unknown source actor '{}' specified in channel".format(v))
+            if w not in sdfg: raise Exception("Unknown destination actor '{}' specified in channel".format(w))
+
+            sdfg.add_edge(v, w, **channel)
+
+        return SDFGraph( sdfg )
+
 def load_sdf(filename):
-    data = json.load(open(filename))
-    if 'actors' not in data:
-        raise SDFParseError("Missing field: 'actors'")
+    with open( filename, 'r' ) as stream:
+        data = json.load( stream )
 
-    if 'channels' not in data:
-        raise SDFParseError("Missing field: 'channels'")
+        if 'actors' not in data:
+            raise SDFParseError("Missing field: 'actors'")
 
-    # Create empty directed graph
-    sdfg = nx.MultiDiGraph()
+        if 'channels' not in data:
+            raise SDFParseError("Missing field: 'channels'")
 
-    for actor in data['actors']:
-        if 'name' not in actor:
-            raise Exception("Missing field in actor: 'name'")
+        # Create empty directed graph
+        sdfg = nx.MultiDiGraph()
 
-        name = actor['name']
+        for actor in data['actors']:
+            if 'name' not in actor:
+                raise Exception("Missing field in actor: 'name'")
 
-        if 'wcet' not in actor:
-            print("Warning: assuming constant wcet of 1 for actor '{}'".format(name), file=sys.stderr)
-            wcet = 1
-        else:
-            wcet = actor['wcet']
-            
-        sdfg.add_node(name, wcet = wcet)
+            name = actor['name']
 
-    for channel in data['channels']:
-        if 'from' not in channel: raise Exception("Missing field in channel: 'from'")
-        if 'to' not in channel: raise Exception("Missing field in channel: 'to'")
+            if 'wcet' not in actor:
+                print("Warning: assuming constant wcet of 1 for actor '{}'".format(name), file=sys.stderr)
+                wcet = 1
+            else:
+                wcet = actor['wcet']
+                
+            sdfg.add_node(name, wcet = wcet)
 
-        (v, w) = (channel['from'], channel['to'])
-        if v not in sdfg: raise Exception("Unknown source actor '{}' specified in channel".format(v))
-        if w not in sdfg: raise Exception("Unknown destination actor '{}' specified in channel".format(w))
+        for channel in data['channels']:
+            if 'from' not in channel: raise Exception("Missing field in channel: 'from'")
+            if 'to' not in channel: raise Exception("Missing field in channel: 'to'")
 
-        sdfg.add_edge(v, w, **channel)
+            (v, w) = (channel['from'], channel['to'])
+            if v not in sdfg: raise Exception("Unknown source actor '{}' specified in channel".format(v))
+            if w not in sdfg: raise Exception("Unknown destination actor '{}' specified in channel".format(w))
 
-        # remove unnecessary elements
-        #del sdfg.get_edge_data(v, w)['from']
-        #del sdfg.get_edge_data(v, w)['to']
+            sdfg.add_edge(v, w, **channel)
 
-    return SDFGraph( sdfg )
+            # remove unnecessary elements
+            #del sdfg.get_edge_data(v, w)['from']
+            #del sdfg.get_edge_data(v, w)['to']
+
+        return SDFGraph( sdfg )
 
 
 

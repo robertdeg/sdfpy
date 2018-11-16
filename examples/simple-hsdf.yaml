@@ -1,0 +1,20 @@
+graph: 
+    type: "CSDF"
+    actors:
+        - name: 'a'
+          wcet: [2]
+        - name: 'b'
+          wcet: [1]
+        - name: 'c'
+          wcet: [1]
+        - name: 'd'
+          wcet: [2]
+    channels:
+        - {from: 'a', to: 'b', tokens: 1}
+        - {from: 'b', to: 'a', tokens: 2}
+        - {from: 'b', to: 'c', tokens: 0}
+        - {from: 'c', to: 'b', tokens: 14}
+        - {from: 'c', to: 'd', tokens: 0}
+        - {from: 'd', to: 'c', tokens: 2}
+
+

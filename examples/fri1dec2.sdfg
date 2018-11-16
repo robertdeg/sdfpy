@@ -1,0 +1,12 @@
+{
+  "actors": [
+    { "name": "a", "wcet": 3 },
+    { "name": "b", "wcet": 1 }],
+  "channels": [
+    { "from": "a", "to": "b", "production": [3, 3], "consumption": [2, 4], "tokens": 0 },
+    { "from": "b", "to": "a", "production": [2, 4], "consumption": [3, 3], "tokens": 4 },
+    { "from": "b", "to": "b", "production": [1], "consumption": [1], "tokens": 4 }],
+  "type": "csdf"
+}
+
+
