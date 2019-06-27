@@ -37,8 +37,13 @@ def dfs_edges( g, root = None ):
     visited = set()
     stack = list()
 
-    root = root or next(g.nodes())
-    stack.append( (root, g.edges( root )))
+    if g.is_multigraph():
+        edgefun = lambda v: iter(g.edges( v, keys = True ))
+    else:
+        edgefun = lambda v: iter(g.edges( v ))
+    
+    root = root or next(iter(g.nodes()))
+    stack.append( (root, edgefun( root )))
     while stack:
         v, it = stack[-1]
         visited.add( v )
@@ -48,7 +53,7 @@ def dfs_edges( g, root = None ):
 
             _, w, *_ = edge
             if w not in visited:
-                stack.append( (w, g.edges( w )))
+                stack.append( (w, edgefun( w )))
         except StopIteration:
             stack.pop()
 
@@ -216,7 +221,7 @@ def longest_distances( g, root, weight_attr = "weight" ):
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
-                visited[ v ] = g.out_edges( v, keys = True, data = True )
+                visited[ v ] = iter(g.out_edges( v, keys = True, data = True ))
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()
