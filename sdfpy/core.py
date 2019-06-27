@@ -72,12 +72,12 @@ class SDFGraph( nx.MultiDiGraph ):
 
     def to_JSON(self):
         actors = list()
-        for v, data in self.nodes_iter( data = True ):
+        for v, data in self.nodes( data = True ):
             wcet = data.get('wcet', 0)
             actors.append( dict(name = str(v), wcet = wcet if len(wcet) > 1 else wcet[0] ))
 
         channels = list()
-        for v, w, data in self.edges_iter( data = True ):
+        for v, w, data in self.edges( data = True ):
             d = dict(to = str(w))
             d['from'] = str(v)
             prates = data.get('production')
@@ -116,11 +116,11 @@ class SDFGraph( nx.MultiDiGraph ):
             return lambda k: (( k * crate - 1 - tokens ) // prate ) + 1
 
     def __build( self, graph ):
-        for v, data in graph.nodes_iter( data = True ):
+        for v, data in graph.nodes( data = True ):
             wcet = SDFGraph.__validate_vector( v, data.get('wcet', 0), 'wcet' )
             super().add_node( v, wcet = wcet, phases = len( wcet ))
 
-        for u, v, data in graph.edges_iter( data = True ):
+        for u, v, data in graph.edges( data = True ):
             production = SDFGraph.__validate_vector( (u, v), data.get('production', 1), 'production rate' )
             consumption = SDFGraph.__validate_vector( (u, v), data.get('consumption', 1), 'consumption rates' )
             g_uv = gcd( production.sum(), consumption.sum() )
@@ -150,12 +150,12 @@ class SDFGraph( nx.MultiDiGraph ):
                     raise SDFParseError("Channel {} has an invalid capacity specification: {}".format( (u, v), data['capacity'] ))
 
         # update phases
-        for v, data in self.nodes_iter( data = True ):
+        for v, data in self.nodes( data = True ):
             phases = data['phases']
-            for u, _, edge_data in self.in_edges_iter( v, True ):
+            for u, _, edge_data in self.in_edges( v, True ):
                 phases = lcm( phases, len( edge_data['consumption'] ))
 
-            for _, w, edge_data in self.out_edges_iter( v, True ):
+            for _, w, edge_data in self.out_edges( v, True ):
                 phases = lcm( phases, len( edge_data['production'] ))
 
             data['period'] = data['phases'] = phases
@@ -265,7 +265,7 @@ class SDFGraph( nx.MultiDiGraph ):
 
     def prune_parallel_edges( self ):
         multi = dict()
-        for v, w, key, data in self.edges_iter( keys = True, data = True ):
+        for v, w, key, data in self.edges( keys = True, data = True ):
             prates = data.get('production')
             crates = data.get('consumption')
             tokens = data.get('tokens')
@@ -291,7 +291,7 @@ class SDFGraph( nx.MultiDiGraph ):
     def __check_consistency(self):
         node_lcm_rates = {}
 
-        for v, w, data in self.edges_iter( data = True ):
+        for v, w, data in self.edges( data = True ):
             prates = data.get('production')
             crates = data.get('consumption')
 
@@ -616,7 +616,7 @@ def write_sdf_xml( g, filename ):
     sdfprops = etree.SubElement(ag, 'sdfProperties')
     ports = dict()
     actors = dict()
-    for v, data in g.nodes_iter( data = True ):
+    for v, data in g.nodes( data = True ):
         wcet = ','.join(map(str, data['wcet']))
         ports[ v ] = 0
         actors[ v ] = etree.SubElement(sdf, 'actor', name = '{}'.format(v), type = 'A')
@@ -625,7 +625,7 @@ def write_sdf_xml( g, filename ):
         etree.SubElement( processor, 'executionTime', time = '{}'.format( wcet ))
 
     cidx = 0
-    for v, w, data in g.edges_iter( data = True ):
+    for v, w, data in g.edges( data = True ):
         cidx += 1
         prates = ','.join(map( str, data.get('production', [1])))
         crates = ','.join(map( str, data.get('consumption', [1])))
