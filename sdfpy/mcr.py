@@ -26,7 +26,7 @@ class InfeasibleException( PositiveCycle ):
 def max_cycle_ratio( g, estimate = None ):
     maxratio, arg_cycle = None, None
     for scc in nx.strongly_connected_component_subgraphs( g ):
-        root = next( scc.nodes_iter() )
+        root = next( iter( scc.nodes() ))
         scc_mcr, cycle = compute_mcr_component( scc, root, estimate )
         if scc_mcr is None:
             continue
@@ -40,7 +40,7 @@ def max_cycle_ratio( g, estimate = None ):
         if scc.number_of_edges() == 0:
             continue
 
-        for ( v, w, scc_data ) in scc.edges_iter( data = True ):
+        for ( v, w, scc_data ) in scc.edges( data = True ):
             data = g.get_edge_data( v, w )
 
             # negate weight so that we can construct a longest paths tree for the current solution
@@ -70,7 +70,7 @@ def compute_mcr_component( g, root, estimate = None ):
     if estimate is None:
         # determine lower bound for mcr
         estimate = 1
-        for (v, w, data) in g.edges_iter(data=True):
+        for (v, w, data) in g.edges(data=True):
             tokens = data.get('tokens', 0)
             weight = data.get('weight', 0)
             estimate = estimate + max(0, weight)
@@ -81,7 +81,7 @@ def compute_mcr_component( g, root, estimate = None ):
     for v in g:
         initial_graph.add_node( v )
 
-    for v, w, key, data in nx.MultiDiGraph(g).edges_iter(keys = True, data = True):
+    for v, w, key, data in nx.MultiDiGraph(g).edges(keys = True, data = True):
         tokens = data.get('tokens', 0)
         weight = data.get('weight', 0)
         initial_graph.add_edge( v, w, key, weight = weight - tokens * estimate, dist = pdistance(weight, tokens))
@@ -132,7 +132,7 @@ def compute_mcr_component( g, root, estimate = None ):
                 return -ratio, list( path )
             
             # update successors of j; the node key of a successor k can only increase!
-            for _, k, jk_key, data in initial_graph.out_edges_iter(j, keys = True, data = True):
+            for _, k, jk_key, data in initial_graph.out_edges(j, keys = True, data = True):
                 # update priority of (j, k)
                 ratio_k = None
                 if k in queue:
@@ -156,7 +156,7 @@ def compute_mcr_component( g, root, estimate = None ):
 def update_node_key( g, node, pdistances, queue ):
     maxratio, argmax = None, None
     # go over all incoming edges of the node
-    for u, v, key, data in g.in_edges_iter( node, keys = True, data = True ):
+    for u, v, key, data in g.in_edges( node, keys = True, data = True ):
         if u in pdistances:
             delta = pdistances[u] + data['dist'] - pdistances[v]
             # print("Delta for {} = {}".format((u, v), delta))

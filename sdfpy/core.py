@@ -649,7 +649,7 @@ def write_sdf_xml( g, filename ):
 def load_sdf_yaml(filename):
     with open(filename, 'r') as stream:
         try:
-            contents = yaml.load( stream )
+            contents = yaml.load( stream, Loader=yaml.SafeLoader )
             if 'graph' not in contents:
                 raise SDFParseError("Missing field: 'graph'")
 

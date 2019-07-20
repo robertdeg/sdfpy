@@ -263,10 +263,10 @@ def single_rate_as_marked_graph( hsdfg, relate_start_times = True ):
                 raise SDFTransformError("Actor {} has an invalid attribute 'wcet'".format(v))
         
         if relate_start_times:
-            for _, w, vw_data in hsdfg.out_edges_iter( v, True ):
+            for _, w, vw_data in hsdfg.out_edges( v, True ):
                 mg.add_edge( v, w, weight = wcet, tokens = vw_data.get('tokens', 0))
         else:
-            for u, _, uv_data in hsdfg.in_edges_iter( v, True ):
+            for u, _, uv_data in hsdfg.in_edges( v, True ):
                 mg.add_edge( u, v, weight = wcet, tokens = uv_data.get('tokens', 0))
 
     return mg 

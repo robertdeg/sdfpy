@@ -32,7 +32,7 @@ def strictly_periodic_schedule( graph, admissible = True ):
 
     # create a weighted graph representation from mg
     wg = nx.MultiDiGraph()
-    for u, v, data in mg.edges_iter( data = True ):
+    for u, v, data in mg.edges( data = True ):
         wg.add_edge( u, v, weight = data.get('weight', 0) - data.get('tokens', 0) * cycle_time )
 
     # choose a critical node
