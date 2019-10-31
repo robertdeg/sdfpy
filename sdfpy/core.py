@@ -9,6 +9,7 @@ import pdb
 from fractions import Fraction
 from math import gcd
 from sdfpy.integers import lcm
+from sdfpy.cyclic import Cyclic
 from sdfpy.graphs import dfs_edges
 import xml.etree.ElementTree as etree
 
@@ -70,28 +71,28 @@ class SDFGraph( nx.MultiDiGraph ):
     def predecessor_fun( self, v, w, key = 0 ):
         return self[v][w][key].get('pred')
 
-    def to_JSON(self):
+    def as_dictionary(self):
         actors = list()
         for v, data in self.nodes( data = True ):
             wcet = data.get('wcet', 0)
-            actors.append( dict(name = str(v), wcet = wcet if len(wcet) > 1 else wcet[0] ))
+            actors.append( dict(name = str(v), wcet = wcet.as_list() if len(wcet) > 1 else wcet[0] ))
 
         channels = list()
         for v, w, data in self.edges( data = True ):
             d = dict(to = str(w))
             d['from'] = str(v)
             prates = data.get('production')
-            d['production'] = prates if len(prates) > 1 else prates[0]
+            d['production'] = prates.as_list() if len(prates) > 1 else prates[0]
 
             prates = data.get('consumption')
-            d['consumption'] = prates if len(prates) > 1 else prates[0]
+            d['consumption'] = prates.as_list() if len(prates) > 1 else prates[0]
 
             d['tokens'] = data.get('tokens')
 
             channels.append(d)
 
-        root = dict(type='csdf', actors=actors, channels=channels)
-        return json.dumps(root, sort_keys = True, indent = 2)
+        root = { "csdf-graph": dict(actors=actors, channels=channels) }
+        return root
 
     def __successor_fun( prates, crates, tokens ):
         if len( prates ) > 1:
@@ -201,24 +202,24 @@ class SDFGraph( nx.MultiDiGraph ):
         assert attr_dict is None, "FIXME: add_edge does not deal with attr_dict"
 
         production = attr['production'] = SDFGraph.validate_vector( (u, v), attr.get('production', 1), 'production rate' )
-        assert type(production) is cyclic
+        assert type(production) is Cyclic
 
         # update phases
         try:
             phases_u = self.node[u].get('phases', 1)
             self.node[ u ]['phases'] = lcm( len(production), phases_u )
         except KeyError:
-            super().add_node( u, wcet = cyclic( 0 ), phases = len( production ), period = 1 )
+            super().add_node( u, wcet = Cyclic( 0 ), phases = len( production ), period = 1 )
 
         consumption = attr['consumption'] = SDFGraph.validate_vector( (u, v), attr.get('consumption', 1), 'consumption rates' )
-        assert type(consumption) is cyclic
+        assert type(consumption) is Cyclic
 
         # update phases
         try:
             phases_v = self.node[v].get('phases', 1)
             self.node[ v ]['phases'] = lcm( len(consumption), phases_v )
         except KeyError:
-            super().add_node( v, wcet = cyclic( 0 ), phases = len( consumption ), period = 1 )
+            super().add_node( v, wcet = Cyclic( 0 ), phases = len( consumption ), period = 1 )
 
         try:
             tokens = int(attr.get('tokens', 0))
@@ -389,7 +390,7 @@ class SDFGraph( nx.MultiDiGraph ):
             if not lst:
                 raise SDFParseError("Empty {} list for {}".format(description, channel))
 
-            vector = cyclic(lst)
+            vector = Cyclic(lst)
         else:
             try:
                 it = iter(vector[:])
@@ -404,82 +405,16 @@ class SDFGraph( nx.MultiDiGraph ):
                 if not vector:
                     raise SDFParseError("Empty {} list for {}".format(description, vector_name))
 
-                vector = cyclic(lst)
+                vector = Cyclic(lst)
             except TypeError:
                 try:
-                    vector = cyclic(int(vector))
+                    vector = Cyclic(int(vector))
                 except ValueError:
                     raise SDFParseError("{} has an invalid {}: {}".format( vector_name, description, vector) )
 
         return vector
 
 
-class cyclic( tuple ):
-    def __new__(self, *arg):
-        try:
-            return super().__new__(self, tuple(*arg))
-        except TypeError as e:
-            return super().__new__(self, tuple(arg))
-
-    def __init__(self, *arg):
-        self.__sum = sum(self)
-    
-    def __getitem__(self, idx):
-        if type(idx) is slice:
-            start = idx.start or 0
-            start_mod = start % len(self)
-
-            step = idx.step or 1
-            period = len(self) // gcd( step, len(self) )
-
-            pattern = []
-            for i in range(period):
-                if (idx.stop or 1) > 0:
-                    pattern.append(super().__getitem__((start + i * step) % len(self)))
-                else:
-                    pattern.append(super().__getitem__((start - i * step) % len(self)))
-            
-            if idx.stop is not None:
-                # return tuple
-                if idx.stop >= 0:
-                    result_len = max(0, 1 + (idx.stop - start - 1) // step)
-                    num_periods = result_len // period
-                    mod_periods = result_len % period
-                    return tuple( pattern * num_periods + pattern[:mod_periods] )
-                else:
-                    result_len = max(0, 1 + (start - idx.stop - 1) // step)
-                    num_periods = result_len // period
-                    mod_periods = result_len % period
-                    return tuple( pattern * num_periods + pattern[:mod_periods] )
-            else:
-                # return cyclic pattern
-                return cyclic( pattern )
-        else:
-            return super().__getitem__(idx % len(self))
-
-    def sum(self, start = 0, stop = None, step = 1):
-        start_mod = start % len(self)
-        period = len(self) // gcd( step, len(self) )
-
-        pattern = self
-        psum = self.__sum
-        if start_mod > 0 or step != 1:
-            pattern = []
-            psum = 0
-            for i in range(period):
-                elem = super().__getitem__((start + i * step) % len(self))
-                psum += elem
-                pattern.append(elem)
-        
-        if stop is None:
-            stop = len(self)
-
-        # return tuple
-        result_len = max(0, 1 + (stop - start - 1) // step)
-        num_periods = result_len // period
-        mod_periods = result_len % period
-        return num_periods * psum + sum(pattern[:mod_periods])
-    
 class SDFParseError(Exception):
     pass
 
@@ -601,13 +536,17 @@ def load_sdf_xml(filename):
         except ValueError:
             raise SDFParseError("Invalid initialTokens attribute for channel {}".format(channel_element.get('name')))
 
-        sdfg.add_edge( src[0], dst[0], production = cyclic(production), consumption = cyclic(consumption), tokens = tokens )
+        sdfg.add_edge( src[0], dst[0], production = Cyclic(production), consumption = Cyclic(consumption), tokens = tokens )
 
     return SDFGraph( sdfg )
 
 def write_sdf_json( g, filename ):
     with open(filename, 'w') as outfile:
-        outfile.write( g.to_JSON())
+        outfile.write( json.dumps(g.as_dictionary(), sort_keys = True, indent = 2 ))
+
+def write_sdf_yaml( g, filename ):
+    with open(filename, 'w') as outfile:
+        outfile.write( yaml.dump( g.as_dictionary(), indent = 2 ))
 
 def write_sdf_xml( g, filename ):
     root = etree.Element('sdf3', type = 'sdf', version = '1.0')
