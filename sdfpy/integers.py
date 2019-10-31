@@ -78,3 +78,26 @@ def mul_inv(a, b):
     if x1 < 0: x1 += b0
     return x1
 
+
+def max_mods(a1, b1, m1, a2, b2, m2):
+    """ Computes the maximum of the sum of:
+        
+          (a1 + b1 * x) mod m1 + (a2 + b2 * x) mod m2,
+        
+        taken over all possible integer values of x
+    """
+    values1 = m1 // gcd( b1, m1 )
+    values2 = m2 // gcd( b2, m2 )
+    count = lcm( values1, values2 )
+    max_v = -1, 0, 0
+    arg_max = None
+    for i in range(2 * count):
+        v1 = (a1 + b1 * i) % m1
+        v2 = (a2 + b2 * i) % m2
+        v = v1 + v2
+        if v > max_v[0]:
+            max_v = v, v1, v2
+            arg_max = i
+            
+    print("Max value = {}, attained at x = {}".format(max_v[0], arg_max))
+    print("Value: {} + {}".format( max_v[1], max_v[2] ))
