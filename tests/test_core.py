@@ -15,8 +15,8 @@ class TestLoadJSON(unittest.TestCase):
             self.assertEqual( s[('a', 'b')], 1 )
             self.assertEqual( s[('b', 'a')], 1 )
             self.assertEqual( s[('b', 'b')], 2 )
-            self.assertEqual( g.node['a']['period'], 1 )
-            self.assertEqual( g.node['b']['period'], 3 )
+            self.assertEqual( g.nodes['a']['period'], 1 )
+            self.assertEqual( g.nodes['b']['period'], 3 )
         except Exception as e:
             self.fail()
 
@@ -35,9 +35,9 @@ class TestLoadJSON(unittest.TestCase):
             self.assertEqual( s[('b', 'c')], 2 )
             self.assertEqual( s[('c', 'b')], 2 )
             self.assertEqual( s[('c', 'c')], 2 )
-            self.assertEqual( g.node['a']['period'], 1 )
-            self.assertEqual( g.node['b']['period'], 3 )
-            self.assertEqual( g.node['c']['period'], 1 )
+            self.assertEqual( g.nodes['a']['period'], 1 )
+            self.assertEqual( g.nodes['b']['period'], 3 )
+            self.assertEqual( g.nodes['c']['period'], 1 )
         except Exception as e:
             self.fail()
 
@@ -54,8 +54,8 @@ class TestLoadYAML(unittest.TestCase):
             self.assertEqual( s[('a', 'b')], 1 )
             self.assertEqual( s[('b', 'a')], 1 )
             self.assertEqual( s[('b', 'b')], 2 )
-            self.assertEqual( g.node['a']['period'], 1 )
-            self.assertEqual( g.node['b']['period'], 3 )
+            self.assertEqual( g.nodes['a']['period'], 1 )
+            self.assertEqual( g.nodes['b']['period'], 3 )
         except Exception as e:
             self.fail()
 
@@ -74,9 +74,9 @@ class TestLoadYAML(unittest.TestCase):
             self.assertEqual( s[('b', 'c')], 2 )
             self.assertEqual( s[('c', 'b')], 2 )
             self.assertEqual( s[('c', 'c')], 2 )
-            self.assertEqual( g.node['a']['period'], 1 )
-            self.assertEqual( g.node['b']['period'], 3 )
-            self.assertEqual( g.node['c']['period'], 1 )
+            self.assertEqual( g.nodes['a']['period'], 1 )
+            self.assertEqual( g.nodes['b']['period'], 3 )
+            self.assertEqual( g.nodes['c']['period'], 1 )
         except Exception as e:
             self.fail()
 

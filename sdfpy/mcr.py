@@ -23,9 +23,16 @@ class InfeasibleException( PositiveCycle ):
     def __init__(self, cycle):
         super().__init__( cycle )
 
+
+# Added for compatibility with newer versions of networkx
+def strongly_connected_components_sg(g):
+    for c in nx.strongly_connected_components(g):
+        yield g.subgraph(c)
+
 def max_cycle_ratio( g, estimate = None ):
     maxratio, arg_cycle = None, None
-    for scc in nx.strongly_connected_component_subgraphs( g ):
+    #for scc in nx.strongly_connected_component_subgraphs( g ):
+    for scc in strongly_connected_components_sg( g ):
         root = next( iter( scc.nodes() ))
         scc_mcr, cycle = compute_mcr_component( scc, root, estimate )
         if scc_mcr is None:
@@ -36,7 +43,8 @@ def max_cycle_ratio( g, estimate = None ):
             arg_cycle = cycle
 
     forest = Forest()
-    for scc in nx.strongly_connected_component_subgraphs( g, False ):
+    #for scc in nx.strongly_connected_component_subgraphs( g, False ):
+    for scc in strongly_connected_components_sg( g):
         if scc.number_of_edges() == 0:
             continue
 

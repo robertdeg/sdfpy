@@ -3,7 +3,7 @@ import sdfpy.core as core
 import sdfpy.mcr as mcr
 import uuid
 
-from sdfpy.core import cyclic, predecessor
+from sdfpy.core import Cyclic, predecessor
 from fractions import Fraction
 from math import gcd
 from sdfpy.integers import xgcd, lcm
@@ -13,7 +13,7 @@ def sample_prates(vector, offset, period):
     if the producing actor is unfolded period times.
     NOTE: offset is 0-based
     """
-    vector = cyclic(vector)
+    vector = Cyclic(vector)
     pattern = [None] * (len(vector) // gcd( len(vector), period ))
     for i in range(len(pattern)):
         start = offset + i * period
@@ -21,14 +21,14 @@ def sample_prates(vector, offset, period):
         pattern[i] = vector.sum(start, end)
 
     token_delta = vector.sum(stop = offset)
-    return token_delta, cyclic(pattern)
+    return token_delta, Cyclic(pattern)
 
 def sample_crates(vector, offset, period):
     """ Returns the consumption rates of actor[offset]
     if the consuming actor is unfolded period times.
     NOTE: offset is 0-based
     """
-    vector = cyclic(vector)
+    vector = Cyclic(vector)
     pattern = [None] * (len(vector) // gcd( len(vector), period ))
     for i in range(len(pattern)):
         start = offset + 1 + (i - 1) * period
@@ -36,7 +36,7 @@ def sample_crates(vector, offset, period):
         pattern[i] = vector.sum(start, end)
 
     token_delta = pattern[0] - vector.sum(stop = offset + 1)
-    return token_delta, cyclic(pattern)
+    return token_delta, Cyclic(pattern)
 
 def predecessor_lin_bounds( **kwargs ):
     prates = kwargs.get('production')
@@ -68,13 +68,13 @@ def unfold( sdfg, dct = None, **periods ):
     for v, data in sdfg.nodes_iter( data = True ):
         Tv = periods.get(v, 1)
         for i in range(Tv):
-            result.add_node( (v, i + 1) if Tv > 1 else v, wcet = data.get('wcet', core.cyclic(0))[i::Tv])
+            result.add_node( (v, i + 1) if Tv > 1 else v, wcet = data.get('wcet', core.Cyclic(0))[i::Tv])
 
     for v, w, data in sdfg.edges_iter( data = True ):
         Tv = periods.get(v, 1)
         Tw = periods.get(w, 1)
-        prates = data.get('production', core.cyclic(1))
-        crates = data.get('consumption', core.cyclic(1))
+        prates = data.get('production', core.Cyclic(1))
+        crates = data.get('consumption', core.Cyclic(1))
         tokens = data.get('tokens', 0)
         plen = len(prates)
 
@@ -142,11 +142,11 @@ def multi_rate_equivalent( sdfg ):
     for v, data in sdfg.nodes_iter( data = True ):
         phi = data.get('phases', 1)
         for i in range(phi):
-            result.add_node((v, i + 1), wcet = data.get('wcet', core.cyclic(0))[i])
+            result.add_node((v, i + 1), wcet = data.get('wcet', core.Cyclic(0))[i])
 
     for v, w, data in sdfg.edges_iter( data = True ):
-        Tv = sdfg.node[v].get('phases', 1)
-        Tw = sdfg.node[w].get('phases', 1)
+        Tv = sdfg.nodes[v].get('phases', 1)
+        Tw = sdfg.nodes[w].get('phases', 1)
         prates = data.get('production')
         crates = data.get('consumption')
         tokens = data.get('tokens')
@@ -192,13 +192,13 @@ def single_rate_equivalent( sdfg ):
     multi = nx.MultiDiGraph( sdfg )
     q = sdfg.repetition_vector()
     for v in sdfg:
-        assert 'wcet' in sdfg.node[v], "Missing 'wcet' attribute for node {}".format(v)
-        wcets = cyclic(sdfg.node[v]['wcet'])
+        assert 'wcet' in sdfg.nodes[v], "Missing 'wcet' attribute for node {}".format(v)
+        wcets = Cyclic(sdfg.nodes[v]['wcet'])
 
         for i in range(q[v]):
             hsdfg.add_node( (v, i + 1), wcet = wcets[i % len(wcets)] )
 
-        for u, _, key, data in multi.in_edges_iter( v, data = True, keys = True ):
+        for u, _, key, data in multi.in_edges( v, data = True, keys = True ):
             prates = data.get('production')
             crates = data.get('consumption')
             tokens = data.get('tokens')
@@ -292,7 +292,7 @@ def fire( sdfg, firings_dict = None, **attr ):
                 data['tokens'] += prates.sum(0,firings)
                 data['production'] = prates[firings:]
 
-            for v, _, data in sdfg.in_edges_iter( v, True ):
+            for v, _, data in sdfg.in_edges( v, True ):
                 crates = data.get('consumption')
                 data['tokens'] -= crates.sum(0, firings)
                 data['consumption'] = crates[firings:]
@@ -305,7 +305,7 @@ def fire( sdfg, firings_dict = None, **attr ):
                 data['tokens'] -= prates.sum(firings, 0)
                 data['production'] = prates[firings:]
 
-            for v, _, data in sdfg.in_edges_iter( v, True ):
+            for v, _, data in sdfg.in_edges( v, True ):
                 crates = data.get('consumption')
                 data['tokens'] += crates.sum(firings, 0)
                 data['consumption'] = crates[firings:]

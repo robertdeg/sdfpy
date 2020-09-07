@@ -270,8 +270,10 @@ def shortest_distances( g, root, weight_attr = "weight" ):
             try:
                 # visit next child
                 children = visited[ v ]
+                import pdb
+                pdb.set_trace()
                 try:
-                    _, w, key, data = next( children )
+                    _, w, key, data = next( children)
                     weight = data.get( weight_attr )
                     distance_to_w = distances.get( w )
                     distance_via_v = distance_from_v + weight
