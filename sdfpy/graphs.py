@@ -263,6 +263,8 @@ def shortest_distances( g, root, weight_attr = "weight" ):
     while queue:
         # run DFS from nodes in queue
         visited = dict()
+        # maintain iterators for all the visited nodes
+        visited_it = dict()
         while queue:
             # peek queue
             v = queue[ -1 ]
@@ -270,8 +272,11 @@ def shortest_distances( g, root, weight_attr = "weight" ):
             try:
                 # visit next child
                 children = visited[ v ]
+                if v not in visited_it:
+                    visited_it[v]= children.__iter__()
+                children_it = visited_it[v]
                 try:
-                    _, w, key, data = next( children )
+                    _, w, key, data = next( children_it)
                     weight = data.get( weight_attr )
                     distance_to_w = distances.get( w )
                     distance_via_v = distance_from_v + weight
@@ -299,13 +304,13 @@ def shortest_distances( g, root, weight_attr = "weight" ):
                 except StopIteration:
                     # post visit v
                     post_order.append( v )
-
                     # indicate that v is post-visited
                     visited[ v ] = None
                     queue.pop()
             except KeyError:
                 # not visited yet, pre-visit v
                 visited[ v ] = g.out_edges( v, keys = True, data = True )
+
 
         # go over nodes in reverse post order (i.e. topological order)
         visited = dict()

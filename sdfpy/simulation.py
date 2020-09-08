@@ -19,7 +19,7 @@ def periodic_state( graph, time, admissible = True ):
 
     # compute completed and active firings
     firings = dict()
-    for v, data in graph.nodes_iter( data = True ):
+    for v, data in graph.nodes( data = True ):
         start_v, period_v = schedule[ v ]
         wcets = data['wcet']
 
@@ -51,7 +51,7 @@ def periodic_state( graph, time, admissible = True ):
             active = future )
 
     # compute marking
-    for v, w, key, data in graph.edges_iter( keys = True, data = True ):
+    for v, w, key, data in graph.edges( keys = True, data = True ):
         crates = data['consumption']
         prates = data['production']
         tokens = data['tokens']
@@ -87,23 +87,23 @@ def build_simulation_graph( graph ):
     In addition to this, the graph maintains a queue that contains future actor finish times.
     """
     g = nx.MultiDiGraph( queue = list(), time = 0 )
-    for v, data in graph.nodes_iter( data = True ):
+    for v, data in graph.nodes( data = True ):
         data = data.copy()
         num_phases = data[ 'phases' ]
         active = data.get('active', {0: 0})
 
-        g.add_node( v, data,
-            latest = max( t for t in active ),
-            blocked_on = set())
+        data['latest'] = max( t for t in active )
+        data['blocked_on'] = set()
+        g.add_node( v, **data)
 
-    for v, w, key, data in graph.edges_iter( keys = True, data = True ):
+    for v, w, key, data in graph.edges( keys = True, data = True ):
         crates = data['consumption']
         tokens = data['tokens']
         data = data.copy()
-        g.add_edge( v, w, key, data )
+        g.add_edge( v, w, key, **data )
 
         if tokens < crates[ 0 ]:
-            g.node[ w ][ 'blocked_on' ].add( (v, w, key) )
+            g.nodes[ w ][ 'blocked_on' ].add( (v, w, key) )
 
     return g
 
@@ -127,7 +127,7 @@ def start_self_timed( graph, node ):
     queue = graph.graph['queue']
     time = graph.graph['time']
 
-    node_data = graph.node[ node ]
+    node_data = graph.nodes[ node ]
     blocked_on = node_data['blocked_on']
     wcets = node_data['wcet']
     period = node_data['phases']
@@ -137,7 +137,7 @@ def start_self_timed( graph, node ):
     blocked_on.clear()
 
     enabled_firings = None
-    for u, v, key, data in graph.in_edges_iter( node, keys = True, data = True ):
+    for u, v, key, data in graph.in_edges( node, keys = True, data = True ):
         consumption = data['consumption']
         tokens = data['tokens']
         i = 0
@@ -147,7 +147,7 @@ def start_self_timed( graph, node ):
 
         enabled_firings = i if enabled_firings is None else min( i, enabled_firings )
 
-    for u, v, key, data in graph.in_edges_iter( node, keys = True, data = True ):
+    for u, v, key, data in graph.in_edges( node, keys = True, data = True ):
         consumption = data['consumption']
 
         # consume tokens
@@ -177,13 +177,13 @@ def start_self_timed( graph, node ):
         wcet = wcets[enabled_firings:])
 
 def finish_actor( graph, node, count):
-    node_data = graph.node[ node ]
+    node_data = graph.nodes[ node ]
 
-    for v, w, key, data in graph.out_edges_iter( node, keys = True, data = True ):
+    for v, w, key, data in graph.out_edges( node, keys = True, data = True ):
         production = data.get('production')
         consumption = data.get('consumption')
 
-        consumer_data = graph.node[ w ]
+        consumer_data = graph.nodes[ w ]
         consumer_blocked_on = consumer_data['blocked_on']
 
         tokens = data.get('tokens') + production.sum( 0, count )
@@ -257,7 +257,7 @@ def print_latex( graph, initial_marking = None, initial_firings = None, actors =
         t, marking, firings = state( g )
 
         print_state( t, marking, firings )
-        ref_iterations = g.node[ ref_actor ].get( 'completed_firings', 0 ) // q[ ref_actor ]
+        ref_iterations = g.nodes[ ref_actor ].get( 'completed_firings', 0 ) // q[ ref_actor ]
         if ref_iterations > completed_iterations:
             h = compute_hash( marking, firings ) % 59
             matches = history.get( h, None )
@@ -293,7 +293,7 @@ def find_throughput( graph, ref_actor = None, initial_marking = None, initial_fi
     for g in state_space:
         t, marking, firings = state( g )
         # print("t = {}: firings = {}, marking = {}".format( t, firings, marking ))
-        ref_iterations = g.node[ ref_actor ].get( 'completed_firings', 0 ) // q[ ref_actor ]
+        ref_iterations = g.nodes[ ref_actor ].get( 'completed_firings', 0 ) // q[ ref_actor ]
         if ref_iterations > completed_iterations:
             h = compute_hash( marking, firings ) % 59
             matches = history.get( h, None )
@@ -319,7 +319,7 @@ def sse_states( graph, initial_marking = None, initial_firings = None ):
     if initial_marking is None:
         # start with the initial marking
         marking = dict()
-        for u, v, key, data in graph.edges_iter( keys = True, data = True ):
+        for u, v, key, data in graph.edges( keys = True, data = True ):
             marking[ (u, v, key) ] = data.get('tokens')
     else:
         # copy the marking
@@ -335,7 +335,7 @@ def sse_states( graph, initial_marking = None, initial_firings = None ):
     # build internal data structure used for simulation
     g = build_simulation_graph( graph )
     # start enabled actors
-    for v, data in g.nodes_iter( data = True ):
+    for v, data in g.nodes( data = True ):
         blocked_on = data['blocked_on']
         if not blocked_on:
             # enable 
@@ -359,7 +359,7 @@ def state( graph ):
         remaining_firings[ actor ] = remaining
 
     marking = dict()
-    for u, v, key, data in graph.edges_iter( keys = True, data = True ):
+    for u, v, key, data in graph.edges( keys = True, data = True ):
         if data.get('tokens', 0) > 0:
             marking[ (u, v, key) ] = data['tokens']
 
@@ -390,7 +390,7 @@ def step( graph ):
         finish_actor( graph, actor, count )
 
     marking = dict()
-    for u, v, key, data in graph.edges_iter( keys = True, data = True ):
+    for u, v, key, data in graph.edges( keys = True, data = True ):
         if data.get('tokens', 0) > 0:
             marking[ (u, v, key) ] = data['tokens']
 

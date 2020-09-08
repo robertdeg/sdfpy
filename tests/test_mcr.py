@@ -3,6 +3,7 @@ import networkx as nx
 import sdfpy.mcr as mcr
 from fractions import Fraction
 
+
 def canonicalform( ls ):
     m = min( ls )
     while ls[ 0 ] > m:

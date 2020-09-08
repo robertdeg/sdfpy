@@ -167,19 +167,19 @@ class SDFGraph( nx.MultiDiGraph ):
         else:
             attr_dict = attr
 
-        assert n not in self.node, "Node already present, remove first"
+        assert n not in self.nodes, "Node already present, remove first"
 
         wcet = attr_dict['wcet'] = SDFGraph.validate_vector(n, attr_dict.get('wcet', 0), 'wcet')
         super().add_node( n, attr_dict)
 
         # set period and phases
-        self.node[ n ]['period'] = self.node[ n ]['phases'] = len(wcet)
+        self.nodes[ n ]['period'] = self.nodes[ n ]['phases'] = len(wcet)
 
     def period(self, v):
-        return self.node[v].get('period')
+        return self.nodes[v].get('period')
 
     def phases( self, v ):
-        return self.node[v].get('phases')
+        return self.nodes[v].get('phases')
 
     def rates( self, v, w ):
         data = self[v][w]
@@ -206,8 +206,8 @@ class SDFGraph( nx.MultiDiGraph ):
 
         # update phases
         try:
-            phases_u = self.node[u].get('phases', 1)
-            self.node[ u ]['phases'] = lcm( len(production), phases_u )
+            phases_u = self.nodes[u].get('phases', 1)
+            self.nodes[ u ]['phases'] = lcm( len(production), phases_u )
         except KeyError:
             super().add_node( u, wcet = Cyclic( 0 ), phases = len( production ), period = 1 )
 
@@ -216,8 +216,8 @@ class SDFGraph( nx.MultiDiGraph ):
 
         # update phases
         try:
-            phases_v = self.node[v].get('phases', 1)
-            self.node[ v ]['phases'] = lcm( len(consumption), phases_v )
+            phases_v = self.nodes[v].get('phases', 1)
+            self.nodes[ v ]['phases'] = lcm( len(consumption), phases_v )
         except KeyError:
             super().add_node( v, wcet = Cyclic( 0 ), phases = len( consumption ), period = 1 )
 
@@ -237,7 +237,7 @@ class SDFGraph( nx.MultiDiGraph ):
             toks = attr.get('tokens')
 
             aux, c = "aux_0", 0
-            while aux in self.node:
+            while aux in self.nodes:
                 c += 1
                 aux = "aux_{}".format(c)
 
@@ -323,8 +323,8 @@ class SDFGraph( nx.MultiDiGraph ):
             # get rates of channel (v, w)
             data = self.get_edge_data( v, w, key )
             p_vw, c_vw = data.get('production'), data.get('consumption')
-            v_period = self.node[ v ]['period']
-            w_period = self.node[ w ]['period']
+            v_period = self.nodes[ v ]['period']
+            w_period = self.nodes[ w ]['period']
 
             # if there is an edge (w, v) in sdfg, check whether it's consistent with (v, w)
             if v != w and self.has_edge(w, v):
