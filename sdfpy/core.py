@@ -549,41 +549,79 @@ def write_sdf_yaml( g, filename ):
         outfile.write( yaml.dump( g.as_dictionary(), indent = 2 ))
 
 def write_sdf_xml( g, filename ):
-    root = etree.Element('sdf3', type = 'sdf', version = '1.0')
+    # understand if this is an SDF or a CSDF
+    type = 'sdf'
+    for n in g.nodes():
+        if g.nodes[n]['period'] != 1:
+            type = 'csdf'
+            break
+
+    root = etree.Element('sdf3', type=type, version='1.0')
     ag = etree.SubElement(root, 'applicationGraph')
-    sdf = etree.SubElement(ag, 'sdf', name = 'g', type = 'G')
-    sdfprops = etree.SubElement(ag, 'sdfProperties')
+    sdf = etree.SubElement(ag, type, name='g', type='G')
+    sdfprops = etree.SubElement(ag, '{}Properties'.format(type))
     ports = dict()
     actors = dict()
-    for v, data in g.nodes( data = True ):
-        wcet = ','.join(map(str, data['wcet']))
-        ports[ v ] = 0
-        actors[ v ] = etree.SubElement(sdf, 'actor', name = '{}'.format(v), type = 'A')
-        actorprops = etree.SubElement(sdfprops, 'actorProperties', actor = '{}'.format(v))
-        processor = etree.SubElement(actorprops, 'processor', type = 'p1', default = 'true')
-        etree.SubElement( processor, 'executionTime', time = '{}'.format( wcet ))
+    for v, data in g.nodes(data=True):
+        if type == 'csdf' and len(
+                data['wcet']) == 1 and data['phases'] != 1:
+            # Special case: to deal with manually created SDFG
+            # replicate the wcet time as many time as phases
+            # to have an XML file compatible with SDF3
+            lst = [data['wcet'][0] for i in range(data['phases'])]
+            wcet = ','.join(map(str, lst))
+        else:
+            wcet = ','.join(map(str, data['wcet']))
+        ports[v] = 0
+        actors[v] = etree.SubElement(sdf,
+                                     'actor',
+                                     name='{}'.format(v),
+                                     type='A')
+        actorprops = etree.SubElement(sdfprops,
+                                      'actorProperties',
+                                      actor='{}'.format(v))
+        processor = etree.SubElement(actorprops,
+                                     'processor',
+                                     type='p1',
+                                     default='true')
+        etree.SubElement(processor,
+                         'executionTime',
+                         time='{}'.format(wcet))
 
     cidx = 0
-    for v, w, data in g.edges( data = True ):
+    for v, w, data in g.edges(data=True):
         cidx += 1
-        prates = ','.join(map( str, data.get('production', [1])))
-        crates = ','.join(map( str, data.get('consumption', [1])))
+        prates = ','.join(map(str, data.get('production', [1])))
+        crates = ','.join(map(str, data.get('consumption', [1])))
 
         # add source port
-        srcport = etree.SubElement( actors[v], 'port', name = 'p{}prod'.format( ports[v] ), type = 'out', rate = prates)
-        dstport = etree.SubElement( actors[w], 'port', name = 'p{}cons'.format( ports[w] ), type = 'in', rate = crates)
-        xmldata = dict(
-            srcActor = '{}'.format(v), srcPort = 'p{}prod'.format( ports[ v ]),
-            dstActor = '{}'.format(w), dstPort = 'p{}cons'.format( ports[ w ]))
-        ports[ v ] += 1; ports[ w ] += 1
+        srcport = etree.SubElement(actors[v],
+                                   'port',
+                                   name='p{}prod'.format(ports[v]),
+                                   type='out',
+                                   rate=prates)
+        dstport = etree.SubElement(actors[w],
+                                   'port',
+                                   name='p{}cons'.format(ports[w]),
+                                   type='in',
+                                   rate=crates)
+        xmldata = dict(srcActor='{}'.format(v),
+                       srcPort='p{}prod'.format(ports[v]),
+                       dstActor='{}'.format(w),
+                       dstPort='p{}cons'.format(ports[w]))
+        ports[v] += 1
+        ports[w] += 1
 
         if data['tokens'] != 0:
             xmldata['initialTokens'] = '{}'.format(data['tokens'])
 
-        channel = etree.SubElement(sdf, 'channel', name = 'ch{}'.format(cidx), **xmldata)
+        channel = etree.SubElement(sdf,
+                                   'channel',
+                                   name='ch{}'.format(cidx),
+                                   **xmldata)
 
-    tree = etree.ElementTree( root )
-    tree.write( filename,  )
+    tree = etree.ElementTree(root)
+    tree.write(filename, )
     
 def load_sdf_yaml(filename):
     with open(filename, 'r') as stream:
